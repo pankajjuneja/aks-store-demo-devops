@@ -1,0 +1,26 @@
+# Azure Subscription ID
+subscription_id = "your-subscription-id"
+
+# Resource Group for Terraform state
+terraform_resource_group = "online-store-terraform-state"
+
+# Storage account for Terraform state
+storage_account_name = "onlinestoretfstate"
+
+# Container name for Terraform state
+terraform_container_name = "terraform"
+
+# Key for Terraform state file
+terraform_state_key = "terraform.tfstate"
+
+# Azure region
+location = "eastus"
+
+# Resource Group for AKS
+resource_group_name = "aks-resource-group"
+
+# AKS Cluster configuration
+aks_cluster_name = "aks-cluster"
+node_count = 2
+vm_size = "Standard_DS2_v2"
+dns_prefix = "aks-cluster"
