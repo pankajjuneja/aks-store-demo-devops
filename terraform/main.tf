@@ -1,37 +1,37 @@
+terraform {
+  required_providers {
+    azurerm = {
+      source  = "hashicorp/azurerm"
+      version = "~> 3.0.0"
+    }
+  }
+}
+
 provider "azurerm" {
   features {}
 }
 
 resource "azurerm_resource_group" "aks" {
-  name     = "aks-resource-group"
-  location = "eastus"
+  name     = var.resource_group_name
+  location = var.location
 }
 
 resource "azurerm_kubernetes_cluster" "aks" {
-  name                = "aks-cluster"
+  name                = "aks-${var.resource_group_name}"
   location            = azurerm_resource_group.aks.location
   resource_group_name = azurerm_resource_group.aks.name
-  dns_prefix          = "aks-cluster"
+  dns_prefix          = "aks-${var.resource_group_name}"
 
   default_node_pool {
     name       = "default"
-    node_count = 2
-    vm_size    = "Standard_DS2_v2"
+    node_count = 3
+    vm_size    = "Standard_DS3_v2"
   }
 
   identity {
     type = "SystemAssigned"
   }
 
-  addon_profile {
-    http_application_routing {
-      enabled = true
-    }
-  }
-
-  enable_workload_identity = true
-
-  oidc_issuer_profile {
-    enabled = true
-  }
+  oidc_issuer_enabled = true
+  workload_identity_enabled = true
 }

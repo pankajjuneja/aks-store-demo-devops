@@ -1,0 +1,168 @@
+trigger:
+- main
+
+pool:
+  vmImage: 'ubuntu-latest'
+
+variables:
+  # Azure Container Registry
+  ACR_NAME: $(acrName)
+  ACR_LOGIN_SERVER: $(acrName).azurecr.io
+  ACR_USERNAME: $(acrName)
+  ACR_PASSWORD: $(acrPassword)
+  
+  # Docker
+  DOCKERFILE: $(System.DefaultWorkingDirectory)/order-service/Dockerfile
+  IMAGE_NAME: 'order-service'
+  
+  # Terraform
+  TF_VAR_subscription_id: $(subscriptionId)
+  TF_VAR_resource_group_name: $(resourceGroupName)
+  TF_VAR_location: $(location)
+
+stages:
+- stage: CodeScan
+  displayName: 'Code Scanning'
+  jobs:
+  - job: SecurityScan
+    displayName: 'Run Security Scans'
+    pool:
+      vmImage: 'ubuntu-latest'
+    steps:
+    - task: SonarQubePrepare@5
+      inputs:
+        SonarQube: 'SonarQube'
+        projectKey: 'order-service'
+        projectName: 'Order Service'
+        extraProperties: |
+          sonar.sourceEncoding=UTF-8
+          sonar.java.binaries=.
+          sonar.java.libraries=.
+          sonar.java.test.binaries=.
+          sonar.java.test.libraries=.
+
+    - task: SonarQubeAnalyze@5
+      inputs:
+        SonarQube: 'SonarQube'
+        projectKey: 'order-service'
+        projectName: 'Order Service'
+
+    - task: SonarQubePublish@5
+      inputs:
+        SonarQube: 'SonarQube'
+        projectKey: 'order-service'
+        projectName: 'Order Service'
+
+- stage: BuildAndPush
+  displayName: 'Build and Push Docker Image'
+  dependsOn: CodeScan
+  jobs:
+  - job: BuildPush
+    displayName: 'Build and Push'
+    pool:
+      vmImage: 'ubuntu-latest'
+    steps:
+    - task: Docker@2
+      inputs:
+        containerRegistry: 'Azure Container Registry'
+        repository: $(IMAGE_NAME)
+        command: 'build'
+        Dockerfile: $(DOCKERFILE)
+        tags: |
+          $(Build.BuildId)
+          latest
+    - task: Docker@2
+      inputs:
+        containerRegistry: 'Azure Container Registry'
+        repository: $(IMAGE_NAME)
+        command: 'push'
+        tags: |
+          $(Build.BuildId)
+          latest
+
+- stage: Infrastructure
+  displayName: 'Infrastructure Deployment'
+  dependsOn: BuildAndPush
+  jobs:
+  - job: DeployInfrastructure
+    displayName: 'Deploy Infrastructure'
+    pool:
+      vmImage: 'ubuntu-latest'
+    steps:
+    - task: AzureCLI@2
+      inputs:
+        azureSubscription: $(azureSubscription)
+        scriptType: 'bash'
+        scriptLocation: 'inlineScript'
+        inlineScript: 'az account show'
+    - task: AzureCLI@2
+      inputs:
+        azureSubscription: $(azureSubscription)
+        scriptType: 'bash'
+        scriptLocation: 'inlineScript'
+        inlineScript: |
+          az group create --name $(resourceGroupName) --location $(location)
+          az storage account create --name terraformstate$(resourceGroupName) --resource-group $(resourceGroupName) --location $(location) --sku Standard_LRS
+          az storage container create --name terraform --account-name terraformstate$(resourceGroupName)
+    - task: TerraformInstaller@1
+      inputs:
+        terraformVersion: 0.12.29
+    - task: TerraformCLI@2
+      inputs:
+        command: 'init'
+        workingDirectory: '$(System.DefaultWorkingDirectory)/terraform'
+        backendType: 'AzureRM'
+        backendAzureRMServiceConnection: '$(azureSubscription)'
+        backendAzureRMResourceGroupName: '$(resourceGroupName)'
+        backendAzureRMStorageAccountName: 'terraformstate$(resourceGroupName)'
+        backendAzureRMContainerName: 'terraform'
+        backendAzureRMKey: 'terraform.tfstate'
+        backendAzureRmSubscriptionId: '$(subscriptionId)'
+        backendAzureRmTenantId: '$(tenantId)'
+        backendAzureRMKeyVaultName: 'terraformkv$(resourceGroupName)'
+        backendAzureRMKeyVaultSecretName: 'terraform-backend-key'
+    - task: TerraformCLI@2
+      inputs:
+        command: 'plan'
+        workingDirectory: '$(System.DefaultWorkingDirectory)/terraform'
+        commandOptions: '-out=terraform.tfplan'
+    - task: TerraformCLI@2
+      inputs:
+        command: 'apply'
+        workingDirectory: '$(System.DefaultWorkingDirectory)/terraform'
+        commandOptions: '-auto-approve'
+
+- stage: DeployApplication
+  displayName: 'Deploy Application'
+  dependsOn: Infrastructure
+  jobs:
+  - job: DeployApp
+    displayName: 'Deploy Application'
+    pool:
+      vmImage: 'ubuntu-latest'
+    steps:
+    - task: HelmInstaller@1
+      inputs:
+        version: 'latest'
+    - task: AzureCLI@2
+      inputs:
+        azureSubscription: 'Azure Subscription'
+        scriptType: 'bash'
+        scriptLocation: 'inlineScript'
+        inlineScript: |
+          # Get credentials for AKS cluster
+          az aks get-credentials \
+            --resource-group $(resourceGroupName) \
+            --name $(aksClusterName) \
+            --admin \
+            --overwrite-existing
+          
+          # Deploy Helm chart
+          helm upgrade --install order-service \
+            $(System.DefaultWorkingDirectory)/helm \
+            --set image.tag=$(Build.BuildId) \
+            --set tls.secretName=tls-secret \
+            --set tls.hosts[0]=$(hostname) \
+            --set image.repository=$(acrName).azurecr.io/order-service \
+            --set image.pullSecrets[0].name=acr-secret \
+            --namespace default

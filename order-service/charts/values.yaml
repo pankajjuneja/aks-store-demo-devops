@@ -40,11 +40,6 @@ ingress:
   tls: []
 
 # Service configuration
-service:
-  type: ClusterIP
-  port: 80
-  targetPort: 8080
-  
 # Liveness and readiness probes
 livenessProbe:
   enabled: true
