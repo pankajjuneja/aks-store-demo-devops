@@ -17,7 +17,7 @@ aks-store-demo-devops/
 ├── terraform/            # Infrastructure as Code (IaC)
 │   ├── main.tf           # Main Terraform configuration
 │   ├── variables.tf      # Terraform input variables
-│   └── terraform.tfvars.example  # Example Terraform variables
+│   └── terraform.tfvars  # Example Terraform variables
 └── README.md            # Project documentation
 ```
 
@@ -41,7 +41,7 @@ aks-store-demo-devops/
 
 2. Create a `terraform.tfvars` file from the example:
    ```bash
-   cp terraform.tfvars.example terraform.tfvars
+   cp terraform.tfvars envnameterraform.tfvars
    ```
 
 3. Update `terraform.tfvars` with your Azure credentials and configuration
@@ -118,15 +118,3 @@ Both probes check the `/health` endpoint of the application.
 - Resource limits are configured to prevent resource exhaustion
 - Health checks ensure the application is running properly
 - Docker images are built with security best practices
-
-## Contributing
-
-1. Fork the repository
-2. Create your feature branch (`git checkout -b feature/AmazingFeature`)
-3. Commit your changes (`git commit -m 'Add some AmazingFeature'`)
-4. Push to the branch (`git push origin feature/AmazingFeature`)
-5. Open a Pull Request
-
-## License
-
-This project is licensed under the MIT License - see the LICENSE file for details.
