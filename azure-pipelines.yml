@@ -106,8 +106,8 @@ stages:
           az storage container create --name terraform --account-name terraformstate$(resourceGroupName)
     - task: TerraformInstaller@1
       inputs:
-        terraformVersion: 0.12.29
-    - task: TerraformCLI@2
+        terraformVersion: 1.11.4
+    - task: TerraformTaskV4@4
       inputs:
         command: 'init'
         workingDirectory: '$(System.DefaultWorkingDirectory)/terraform'
@@ -121,12 +121,12 @@ stages:
         backendAzureRmTenantId: '$(tenantId)'
         backendAzureRMKeyVaultName: 'terraformkv$(resourceGroupName)'
         backendAzureRMKeyVaultSecretName: 'terraform-backend-key'
-    - task: TerraformCLI@2
+    - task: TerraformTaskV4@4
       inputs:
         command: 'plan'
         workingDirectory: '$(System.DefaultWorkingDirectory)/terraform'
         commandOptions: '-out=terraform.tfplan'
-    - task: TerraformCLI@2
+    - task: TerraformTaskV4@4
       inputs:
         command: 'apply'
         workingDirectory: '$(System.DefaultWorkingDirectory)/terraform'
