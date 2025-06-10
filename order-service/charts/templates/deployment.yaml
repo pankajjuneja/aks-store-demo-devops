@@ -4,21 +4,25 @@ metadata:
   name: {{ .Release.Name }}
   labels:
     app: order-service
+    release: {{ .Release.Name }}
 spec:
   replicas: {{ .Values.replicaCount }}
   selector:
     matchLabels:
       app: order-service
+      release: {{ .Release.Name }}
   template:
     metadata:
       labels:
         app: order-service
+        release: {{ .Release.Name }}
     spec:
       containers:
       - name: order-service
         image: {{ .Values.image.repository }}:{{ .Values.image.tag }}
         ports:
         - containerPort: 8080
+          name: http
         resources:
           limits:
             memory: {{ .Values.resources.limits.memory }}

@@ -1,0 +1,72 @@
+trigger:
+  - main
+
+pr: none
+
+pool:
+  vmImage: 'ubuntu-latest'
+
+parameters:
+  - name: acrName
+    type: string
+    default: ''
+    displayName: 'Azure Container Registry Name'
+  - name: acrPassword
+    type: string
+    default: ''
+    displayName: 'Azure Container Registry Password'
+
+variables:
+  # Azure Container Registry
+  ACR_NAME: $(parameters.acrName)
+  ACR_LOGIN_SERVER: $(parameters.acrName).azurecr.io
+  ACR_USERNAME: $(parameters.acrName)
+  ACR_PASSWORD: $(parameters.acrPassword)
+  
+  # Build variables
+  BUILD_VERSION: $(Build.BuildId)
+  TAG: $(Build.BuildId)
+
+stages:
+- stage: BuildAndPush
+  displayName: 'Build and Push'
+  jobs:
+  - job: BuildAndPush
+    displayName: 'Build and Push Docker Image'
+    pool:
+      vmImage: 'ubuntu-latest'
+    steps:
+    - task: Docker@2
+      displayName: 'Build Order Service Image'
+      inputs:
+        containerRegistry: 'Azure Container Registry'
+        repository: 'order-service'
+        command: 'build'
+        Dockerfile: 'order-service/src/Dockerfile'
+        buildArgs: |
+          APP_VERSION=$(Build.BuildId)
+        tags: |
+          $(Build.BuildId)
+          latest
+
+    - task: Docker@2
+      displayName: 'Push Order Service Image'
+      inputs:
+        containerRegistry: 'Azure Container Registry'
+        repository: 'order-service'
+        command: 'push'
+        tags: |
+          $(Build.BuildId)
+          latest
+
+    - task: Docker@2
+      displayName: 'Run Tests'
+      inputs:
+        containerRegistry: 'Azure Container Registry'
+        repository: 'order-service'
+        command: 'run'
+        tags: |
+          $(Build.BuildId)
+        arguments: 'npm test'
+
+

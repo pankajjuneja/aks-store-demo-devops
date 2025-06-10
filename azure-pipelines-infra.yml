@@ -1,0 +1,102 @@
+trigger:
+  - none
+
+pr: none
+
+parameters:
+  - name: azureSubscription
+    type: string
+    default: ''
+    displayName: 'Azure Subscription'
+  - name: resourceGroupName
+    type: string
+    default: 'aks-resource-group'
+    displayName: 'Resource Group Name'
+  - name: location
+    type: string
+    default: 'eastus'
+    displayName: 'Azure Location'
+  - name: nodeCount
+    type: number
+    default: 3
+    displayName: 'AKS Node Count'
+  - name: vmSize
+    type: string
+    default: 'Standard_DS3_v2'
+    displayName: 'AKS Node VM Size'
+  - name: storageAccountName
+    type: string
+    default: 'onlinestoretfstate'
+    displayName: 'Storage Account Name'
+  - name: terraformContainerName
+    type: string
+    default: 'terraform'
+    displayName: 'Terraform Container Name'
+
+variables:
+  # Azure
+  AZURE_SUBSCRIPTION: $(parameters.azureSubscription)
+  RESOURCE_GROUP: $(parameters.resourceGroupName)
+  LOCATION: $(parameters.location)
+  
+  # Terraform
+  TF_VAR_resource_group_name: $(parameters.resourceGroupName)
+  TF_VAR_location: $(parameters.location)
+  TF_VAR_node_count: $(parameters.nodeCount)
+  TF_VAR_vm_size: $(parameters.vmSize)
+  TF_VAR_storage_account_name: $(parameters.storageAccountName)
+  TF_VAR_terraform_container_name: $(parameters.terraformContainerName)
+  TF_WORKSPACE: $(parameters.tfWorkspace)
+
+stages:
+- stage: Infrastructure
+  displayName: 'Infrastructure Deployment'
+  dependsOn: []
+  condition: and(succeeded(), eq(variables['Build.SourceBranch'], 'refs/heads/infra'))
+  jobs:
+  - job: Terraform
+    displayName: 'Terraform Infrastructure'
+    pool:
+      vmImage: 'ubuntu-latest'
+    steps:
+    - task: TerraformInstaller@0
+      inputs:
+        terraformVersion: 'latest'
+
+    - task: TerraformTaskV4@4
+      displayName: 'Terraform Init'
+      inputs:
+        provider: 'azurerm'
+        command: 'init'
+        backendServiceArm: '$(AZURE_SUBSCRIPTION)'
+        backendAzureRmResourceGroupName: '$(RESOURCE_GROUP)'
+        backendAzureRmStorageAccountName: '$(TF_WORKSPACE)'
+        backendAzureRmContainerName: 'terraform'
+        backendAzureRmKey: 'terraform.tfstate'
+        workingDirectory: '$(System.DefaultWorkingDirectory)/terraform'
+
+    - task: TerraformTaskV4@4
+      displayName: 'Terraform Plan'
+      inputs:
+        provider: 'azurerm'
+        command: 'plan'
+        environmentServiceNameAzureRM: '$(AZURE_SUBSCRIPTION)'
+        workingDirectory: '$(System.DefaultWorkingDirectory)/terraform'
+        planFile: 'terraform.tfplan'
+        arguments: >
+          -var="node_count=$(parameters.nodeCount)"
+          -var="vm_size=$(parameters.vmSize)"
+          -var="storage_account_name=$(parameters.storageAccountName)"
+          -var="terraform_container_name=$(parameters.terraformContainerName)"
+
+    - task: TerraformTaskV4@4
+      displayName: 'Terraform Apply'
+      inputs:
+        provider: 'azurerm'
+        command: 'apply'
+        environmentServiceNameAzureRM: '$(AZURE_SUBSCRIPTION)'
+        workingDirectory: '$(System.DefaultWorkingDirectory)/terraform'
+        stateFile: 'terraform.tfstate'
+        waitForCompletion: true
+
+

@@ -4,15 +4,37 @@ version: 0.1.0
 # Application configuration
 replicaCount: 2
 image:
-  repository: orderserviceregistry.azurecr.io/order-service
-  tag: "latest"
-  pullPolicy: IfNotPresent
+  repository: ""
+  tag: ""
+  pullPolicy: Always
 
 service:
   type: ClusterIP
-  port: 80
+  port: 8080
   targetPort: 8080
-  
+
+# Network Policy Configuration
+networkPolicy:
+  enabled: true
+  ingress:
+    - from:
+      - podSelector: {}
+      ports:
+      - protocol: TCP
+        port: 8080
+  egress:
+    - to:
+      - podSelector: {}
+      ports:
+      - protocol: TCP
+        port: 8080
+      - protocol: TCP
+        port: 443
+      - protocol: TCP
+        port: 53
+      - protocol: UDP
+        port: 53
+
 resources:
   limits:
     cpu: "500m"
@@ -30,14 +52,11 @@ tolerations: []
 # Ingress configuration
 ingress:
   enabled: true
-  annotations:
-    kubernetes.io/ingress.class: nginx
-  hosts:
-    - host: chart-example.local
-      paths: 
-        - path: /
-          pathType: Prefix
-  tls: []
+  ingressClass: nginx
+  host: localhost
+  annotations: {}
+  paths:
+    - path: /
 
 # Service configuration
 # Liveness and readiness probes
@@ -55,6 +74,6 @@ readinessProbe:
   initialDelaySeconds: 5
   periodSeconds: 10
   failureThreshold: 3
-  httpGet:
-    path: /health
-    port: http
+
+# Additional configuration
+  port: http

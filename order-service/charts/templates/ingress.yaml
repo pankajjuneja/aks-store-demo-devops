@@ -2,15 +2,12 @@ apiVersion: networking.k8s.io/v1
 kind: Ingress
 metadata:
   name: {{ .Release.Name }}
+  labels:
+    app: order-service
+    release: {{ .Release.Name }}
   annotations:
     kubernetes.io/ingress.class: {{ .Values.ingress.ingressClass }}
-    kubernetes.io/tls-acme: "true"
-    cert-manager.io/cluster-issuer: {{ .Values.ingress.clusterIssuer }}
 spec:
-  tls:
-  - hosts:
-    - {{ .Values.ingress.host }}
-    secretName: {{ .Values.ingress.tlsSecretName }}
   rules:
   - host: {{ .Values.ingress.host }}
     http:
@@ -21,4 +18,4 @@ spec:
           service:
             name: {{ .Release.Name }}
             port:
-              number: {{ .Values.service.port }}
+              name: http

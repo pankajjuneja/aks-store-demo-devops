@@ -1,0 +1,78 @@
+trigger: none
+
+resources:
+  pipelines:
+    - pipeline: ci
+      source: 'CI Pipeline'
+      trigger: true
+
+pool:
+  vmImage: 'ubuntu-latest'
+
+parameters:
+  - name: acrName
+    type: string
+    default: ''
+    displayName: 'Azure Container Registry Name'
+  - name: resourceGroupName
+    type: string
+    default: ''
+    displayName: 'Azure Resource Group'
+  - name: aksClusterName
+    type: string
+    default: ''
+    displayName: 'AKS Cluster Name'
+  - name: kubeNamespace
+    type: string
+    default: 'default'
+    displayName: 'Kubernetes Namespace'
+  - name: orderServiceHost
+    type: string
+    default: ''
+    displayName: 'Order Service Host'
+
+variables:
+  # Azure Container Registry
+  ACR_NAME: $(parameters.acrName)
+  ACR_LOGIN_SERVER: $(parameters.acrName).azurecr.io
+  
+  # Kubernetes
+  KUBE_NAMESPACE: $(parameters.kubeNamespace)
+  
+  # Build variables
+  BUILD_VERSION: $(Build.BuildId)
+
+stages:
+- stage: Deploy
+  displayName: 'Deploy to AKS'
+  jobs:
+  - deployment: Deploy
+    displayName: 'Deploy to AKS'
+    pool:
+      vmImage: 'ubuntu-latest'
+    environment: 'aks'
+    strategy:
+      runOnce:
+        deploy:
+          steps:
+          - task: Helm@3
+            displayName: 'Deploy Order Service using Helm'
+            inputs:
+              connectionType: 'Azure Resource Manager'
+              azureSubscriptionEndpoint: 'Azure Service Connection'
+              azureResourceGroup: '$(resourceGroupName)'
+              kubernetesCluster: '$(aksClusterName)'
+              command: 'upgrade'
+              chartType: 'FilePath'
+              chartPath: 'order-service/charts'
+              releaseName: 'order-service'
+              namespace: '$(KUBE_NAMESPACE)'
+              arguments: >
+                --install 
+                --values order-service/charts/values.yaml 
+                --set image.repository=$(ACR_LOGIN_SERVER)/order-service 
+                --set image.tag=$(BUILD_VERSION) 
+                --set image.pullPolicy=Always 
+                --set ingress.host=$(parameters.orderServiceHost)
+
+
