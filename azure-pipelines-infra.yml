@@ -1,7 +1,9 @@
-trigger:
-  - none
+trigger: none  # Pipeline is manually triggered
 
-pr: none
+pr: none  # Pull requests do not trigger this pipeline
+
+# This pipeline is designed to be manually triggered for infrastructure changes
+# to ensure proper review and approval before modifying production resources
 
 parameters:
   - name: azureSubscription
